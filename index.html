@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <title>កម្មវិធីគ្រប់គ្រងហាង</title>
+  <style>
+    body {
+      font-family: 'Khmer OS Battambang', sans-serif;
+      padding: 20px;
+      background: linear-gradient(to right, #fefcea, #f1da36);
+    }
+    h2 {
+      color: #222;
+      background-color: #ffe066;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, select, button {
+      padding: 8px;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background-color: #2b8a3e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #237032;
+    }
+    table {
+      page-break-inside: auto;
+      max-height: 1000px;
+      display: block;
+      overflow-x: auto;
+      overflow-y: auto;
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    th {
+      background-color: #ffd43b;
+      color: #222;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .actions button {
+      margin-right: 5px;
+      background-color: #e03131;
+    }
+    .actions button:hover {
+      background-color: #c92a2a;
+    }
+    .summary {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.1em;
+      background-color: #fff3bf;
+      padding: 10px;
+      border-left: 5px solid #f08c00;
+      border-radius: 4px;
+    }
+    input[type="text"]#searchInput, input[type="date"]#dateFilter {
+      background-color: #fffbe6;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>💰 កំណត់ត្រាចំណូល/ចំណាយ (Oun Leak Shop)</h2>
+
+  <form id="recordForm">
+    <label>ឈ្មោះទំនិញ:</label>
+    <input type="text" id="itemName" required>
+
+    <label>ប្រភេទ:</label>
+    <select id="type">
+      <option value="income" style="color:green">ចំណូល</option>
+      <option value="expense" style="color:red">ចំណាយ</option>
+    </select>
+
+    <label>ចំនួន:</label>
+    <input type="number" id="quantity" min="1" required>
+
+    <label>ឯកតា:</label>
+    <select id="unit">
+      <option value="កំប៉ុង">កំប៉ុង</option>
+      <option value="កញ្ចប់">កញ្ចប់</option>
+      <option value="កេស">កេស</option>
+      <option value="ផ្សេងៗ">ផ្សេងៗ</option>
+    </select>
+
+    <label>តម្លៃ (រៀល):</label>
+    <input type="number" id="price" required>
+
+    <label>កាលបរិច្ឆេទ:</label>
+    <input type="date" id="date" required>
+
+    <button type="submit">➕ បញ្ចូលកំណត់ត្រា</button>
+  </form>
+
+  <h3>🔍 ស្វែងរកកំណត់ត្រា</h3>
+  <input type="text" id="searchInput" placeholder="ស្វែងរក...">
+  <label>ស្វែងរកប្រភេទ:</label>
+  <select id="typeFilter">
+    <option value="">-- ទាំងអស់ --</option>
+    <option value="income">ចំណូល</option>
+    <option value="expense">ចំណាយ</option>
+  </select>
+  <label>ស្វែងរកតាមកាលបរិច្ឆេទ:</label>
+  <input type="date" id="dateFilter">
+
+  <h3>📆 ចំណូល/ចំណាយប្រចាំថ្ងៃ</h3>
+  <table id="recordsTable">
+    <thead>
+      <tr>
+        <th>កាលបរិច្ឆេទ</th>
+        <th>ឈ្មោះទំនិញ</th>
+        <th>ប្រភេទ</th>
+        <th>ចំនួន</th>
+        <th>ឯកតា</th>
+        <th>តម្លៃ (រៀល)</th>
+        <th>សរុប (រៀល)</th>
+        <th>អាក្រាត</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div class="summary" id="summary"></div>
+
+  <button onclick="clearAll()" style="background-color:#f03e3e">🗑️ Clear All</button>
+  <button onclick="exportExcel()">📊 Export ជា Excel</button>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const form = document.getElementById('recordForm');
+      const tableBody = document.querySelector('#recordsTable tbody');
+      const searchInput = document.getElementById('searchInput');
+      const dateInput = document.getElementById('dateFilter');
+      const typeFilter = document.getElementById('typeFilter');
+      const summaryDiv = document.getElementById('summary');
+
+      let records = JSON.parse(localStorage.getItem('records')) || [];
+
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const item = {
+          name: document.getElementById('itemName').value,
+          type: document.getElementById('type').value,
+          quantity: +document.getElementById('quantity').value,
+          unit: document.getElementById('unit').value,
+          price: +document.getElementById('price').value,
+          date: document.getElementById('date').value
+        };
+        records.push(item);
+        localStorage.setItem('records', JSON.stringify(records));
+        renderTable();
+        form.reset();
+      };
+
+      function paginateTable() {
+        const rows = document.querySelectorAll('#tableBody tr');
+        const rowsPerPage = 15;
+        let currentPage = 0;
+        function showPage(page) {
+          currentPage = page;
+          rows.forEach((row, i) => {
+            row.style.display = (Math.floor(i / rowsPerPage) === page) ? '' : 'none';
+          });
+        }
+        if (rows.length > rowsPerPage) {
+          const pageCount = Math.ceil(rows.length / rowsPerPage);
+          const nav = document.createElement('div');
+          nav.id = 'pagination';
+          nav.style.marginTop = '10px';
+
+          const prevBtn = document.createElement('button');
+          prevBtn.innerText = '« ថយក្រោយ';
+          prevBtn.onclick = () => {
+            if (currentPage > 0) showPage(currentPage - 1);
+          };
+          nav.appendChild(prevBtn);
+
+          for (let i = 0; i < pageCount; i++) {
+            const btn = document.createElement('button');
+            btn.innerText = i + 1;
+            btn.onclick = () => showPage(i);
+            nav.appendChild(btn);
+          }
+
+          const nextBtn = document.createElement('button');
+          nextBtn.innerText = 'បន្ទាប់ »';
+          nextBtn.onclick = () => {
+            if (currentPage < pageCount - 1) showPage(currentPage + 1);
+          };
+          nav.appendChild(nextBtn);
+
+          const existing = document.getElementById('pagination');
+          if (existing) existing.remove();
+          document.body.appendChild(nav);
+
+          showPage(0);
+        }
+      }
+
+      searchInput.oninput = renderTable;
+      dateInput.oninput = renderTable;
+      typeFilter.oninput = renderTable;
+
+      function formatCurrency(value) {
+        return new Intl.NumberFormat('km-KH', { style: 'currency', currency: 'KHR' }).format(value);
+      }
+
+      function renderTable() {
+        const filter = searchInput.value.toLowerCase();
+        const dateFilter = dateInput.value;
+        tableBody.innerHTML = '';
+        let totalIncome = 0;
+        let totalExpense = 0;
+        records
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .filter(r => r.name.toLowerCase().includes(filter))
+          .filter(r => !dateFilter || r.date === dateFilter)
+          .filter(r => !typeFilter.value || r.type === typeFilter.value)
+          .forEach((r, index) => {
+            const total = r.quantity * r.price;
+            if (r.type === 'income') totalIncome += total;
+            else totalExpense += total;
+            const row = tableBody.insertRow();
+            const typeColor = r.type === 'income' ? 'green' : 'red';
+            row.innerHTML = `
+              <td>${r.date}</td>
+              <td>${r.name}</td>
+              <td style="color: ${typeColor}; font-weight: bold">${r.type === 'income' ? 'ចំណូល' : 'ចំណាយ'}</td>
+              <td>${r.quantity}</td>
+              <td>${r.unit}</td>
+              <td>${formatCurrency(r.price)}</td>
+              <td>${formatCurrency(total)}</td>
+              <td class="actions">
+                <button onclick="editRecord(${index})">លុប</button>
+              </td>
+            `;
+          });
+        summaryDiv.innerHTML = `
+  <div style="background-color:#d3f9d8; padding:10px; border-radius:5px; margin-bottom:5px;">
+    <span style="color: green">សរុបចំណូល៖</span><br>
+    <strong style="color: green">${formatCurrency(totalIncome)}</strong>
+  </div>
+  <div style="background-color:#ffe3e3; padding:10px; border-radius:5px;">
+    <span style="color: red">សរុបចំណាយ៖</span><br>
+    <strong style="color: red">${formatCurrency(totalExpense)}</strong>
+  </div>`;
+        paginateTable();
+      }
+
+      window.editRecord = function(index) {
+        const r = records[index];
+        document.getElementById('itemName').value = r.name;
+        document.getElementById('type').value = r.type;
+        document.getElementById('quantity').value = r.quantity;
+        document.getElementById('unit').value = r.unit;
+        document.getElementById('price').value = r.price;
+        document.getElementById('date').value = r.date;
+        records.splice(index, 1);
+        localStorage.setItem('records', JSON.stringify(records));
+        renderTable();
+      }
+
+      window.exportExcel = function () {
+        const headers = ['កាលបរិច្ឆេទ', 'ឈ្មោះទំនិញ', 'ប្រភេទ', 'ចំនួន', 'ឯកតា', 'តម្លៃ (រៀល)', 'សរុប (រៀល)'];
+        const rows = records.map(r => [
+          r.date,
+          r.name,
+          r.type === 'income' ? 'ចំណូល' : 'ចំណាយ',
+          r.quantity,
+          r.unit,
+          r.price,
+          r.quantity * r.price
+        ]);
+        let csvContent = 'data:text/csv;charset=utf-8,' + headers.join(',') + '\n';
+        rows.forEach(row => {
+          csvContent += row.join(',') + '\n';
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', 'OunLeakShop_Report.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      window.clearAll = function () {
+        if (confirm('តើអ្នកចង់លុបទិន្នន័យទាំងអស់មែនឬ?')) {
+          records = [];
+          localStorage.removeItem('records');
+          renderTable();
+        }
+      }
+
+      renderTable();
+    });
+  </script>
+</body>
+</html>
